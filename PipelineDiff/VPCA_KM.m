@@ -16,12 +16,12 @@ function [Dcm2]= VPCA_KM(Dcm, enum,pca_min_ernegy)
 %          
 % OUTPUTS:  Dcm2 - DWI image matrix 
 %                 [y x slices b-values directions averages dataset]
-%         
 %           
 %
-% Kevin Moulin 08.14.2017
+% Kevin Moulin 01.13.2020
 % Kevin.Moulin.26@gmail.com
-% Ennis Lab @ UCLA; http://mrrl.ucla.edu
+% Ennis Lab @ UCLA: http://mrrl.ucla.edu
+% Ennis Lab @ Stanford: https://med.stanford.edu/cmrgroup/software.html
    
     Dcm2=[];
     disp('PCA') 

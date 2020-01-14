@@ -11,12 +11,11 @@ function  Gif_KM(Dcm, enum, FileName)
 %
 %           dataset - specify the number of the given serie 
 %
-%                  
-%           
 %
-% Kevin Moulin 08.15.2018
+% Kevin Moulin 01.13.2020
 % Kevin.Moulin.26@gmail.com
-% Ennis Lab @ UCLA; http://mrrl.ucla.edu
+% Ennis Lab @ UCLA: http://mrrl.ucla.edu
+% Ennis Lab @ Stanford: https://med.stanford.edu/cmrgroup/software.html
 
    disp('Gif') 
     h = waitbar(0,['Gif' FileName '...']);

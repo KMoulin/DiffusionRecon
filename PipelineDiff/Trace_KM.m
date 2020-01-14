@@ -6,7 +6,7 @@ function [Dcm2 enum2]= Trace_KM(varargin)
 %
 %  Update the number of directions in enum
 %
-% SYNTAX:  [Dcm2 enum2]= Trace_KM(Dcm, enum)
+% SYNTAX:  [Dcm2 enum2]= Trace_KM(Dcm, enum,Trace_mod)
 %  
 %
 % INPUTS:   Dcm - DWI image matrix
@@ -14,15 +14,20 @@ function [Dcm2 enum2]= Trace_KM(varargin)
 %           
 %           enum - Structure which contains information about the dataset 
 %
+%           Trace_mod - (1) mean (2) median (3) min (4) max
+%
 %          
 % OUTPUTS:  Dcm2 - DWI image matrix
 %                 [y x slices b-values directions averages dataset]
 %           
 %           enum2 - Structure which contains information about the dataset 
 %
-% Kevin Moulin 08.14.2017
+%
+% Kevin Moulin 01.13.2020
 % Kevin.Moulin.26@gmail.com
-% Ennis Lab @ UCLA; http://mrrl.ucla.edu
+% Ennis Lab @ UCLA: http://mrrl.ucla.edu
+% Ennis Lab @ Stanford: https://med.stanford.edu/cmrgroup/software.html
+
     narginchk(2,3);
     if numel(varargin) == 2
           Dcm=varargin{1};

@@ -23,13 +23,13 @@ function [Dcm enum]= AnalyseDataSet_KM(varargin)
 %                 [y x slices b-values directions averages dataset]
 %
 %           
-%           enum - Structure which contains information about the dataset 
-%                  
+%           enum - Structure which contains information about the dataset                   
 %           
 %
-% Kevin Moulin 08.14.2017
+% Kevin Moulin 01.13.2020
 % Kevin.Moulin.26@gmail.com
-% Ennis Lab @ UCLA; http://mrrl.ucla.edu
+% Ennis Lab @ UCLA: http://mrrl.ucla.edu
+% Ennis Lab @ Stanford: https://med.stanford.edu/cmrgroup/software.html
 
     narginchk(1,3);
     if numel(varargin) == 1
@@ -73,57 +73,60 @@ function [Dcm enum]= AnalyseDataSet_KM(varargin)
         if listing(cpt).name(end-2:end) == 'dcm' | listing(cpt).name(end-2:end) == 'IMA'
             
             tmpInfoDcm=dicominfo(listing(cpt).name);
-            [FolderName,name,ext] = fileparts(listing(cpt).name);
             
-            infoDcm(k).name=[name ext]; 
+            if (isfield(tmpInfoDcm, 'Directionality'))  % check if the file is a valid diffusion file
+                [FolderName,name,ext] = fileparts(listing(cpt).name);
+
+                infoDcm(k).name=[name ext]; 
+
+                tmpV=tmpInfoDcm.AcquisitionTime;
+
+                infoDcm(k).AcqTime= (str2double(tmpV(1,1:2))*60*60+str2double(tmpV(1,3:4))*60+str2double(tmpV(1,5:6))) + str2double(tmpV(1,8))*10^-1 + str2double(tmpV(1,9))*10^-2 + str2double(tmpV(1,10))*10^-3 + str2double(tmpV(1,11))*10^-4;  %s
+                VectTime(k)=infoDcm(k).AcqTime;
            
-            tmpV=tmpInfoDcm.AcquisitionTime;
-            
-            infoDcm(k).AcqTime= (str2double(tmpV(1,1:2))*60*60+str2double(tmpV(1,3:4))*60+str2double(tmpV(1,5:6))) + str2double(tmpV(1,8))*10^-1 + str2double(tmpV(1,9))*10^-2 + str2double(tmpV(1,10))*10^-3 + str2double(tmpV(1,11))*10^-4;  %s
-            VectTime(k)=infoDcm(k).AcqTime;
-            
-           if  (strcmp(tmpInfoDcm.Directionality,'NONE') || strcmp(tmpInfoDcm.SequenceName,'ep_b0'))                       
-               infoDcm(k).b = 0;% tmpInfoDcm.Bvalue;
-               infoDcm(k).slc = tmpInfoDcm.SliceLocation; 
-               infoDcm(k).dirV=[0 0 0];
-           else  
-               infoDcm(k).b = tmpInfoDcm.Bvalue;
-               infoDcm(k).slc = tmpInfoDcm.SliceLocation; 
-               if (strcmp(tmpInfoDcm.Directionality,'DIRECTIONAL') &&isfield(tmpInfoDcm, 'DiffusionDirection'))
-                    ImOrien=tmpInfoDcm.ImageOrientationPatient;
-                    Im_3=cross(ImOrien(1:3),ImOrien(4:6));
-                    Im_1=ImOrien(1:3); % attention: this is because matlab read first the colume and second the row
-                    Im_2=ImOrien(4:6);     
-                    infoDcm(k).dirV = ([Im_1';Im_2';Im_3']* tmpInfoDcm.DiffusionDirection)';
-               else
-                    disp('diffusion direction not found')    
-                    infoDcm(k).dirV = [0 0 0];
+               if  (strcmp(tmpInfoDcm.Directionality,'NONE') || strcmp(tmpInfoDcm.SequenceName,'ep_b0'))                       
+                   infoDcm(k).b = 0;% tmpInfoDcm.Bvalue;
+                   infoDcm(k).slc = tmpInfoDcm.SliceLocation; 
+                   infoDcm(k).dirV=[0 0 0];
+               else  
+                   infoDcm(k).b = tmpInfoDcm.Bvalue;
+                   infoDcm(k).slc = tmpInfoDcm.SliceLocation; 
+                   if (strcmp(tmpInfoDcm.Directionality,'DIRECTIONAL') &&isfield(tmpInfoDcm, 'DiffusionDirection'))
+                        ImOrien=tmpInfoDcm.ImageOrientationPatient;
+                        Im_3=cross(ImOrien(1:3),ImOrien(4:6));
+                        Im_1=ImOrien(1:3); % attention: this is because matlab read first the colume and second the row
+                        Im_2=ImOrien(4:6);     
+                        infoDcm(k).dirV = ([Im_1';Im_2';Im_3']* tmpInfoDcm.DiffusionDirection)';
+                   else
+                        disp('diffusion direction not found')    
+                        infoDcm(k).dirV = [0 0 0];
+                   end
                end
+
+                if (isfield(tmpInfoDcm, 'Slice_per_mosa'))
+                    infoDcm(k).slicePerMosa=tmpInfoDcm.Slice_per_mosa;
+                    enum.mosa=tmpInfoDcm.Slice_per_mosa;
+                else 
+                    infoDcm(k).slicePerMosa=1;
+                    enum.mosa=1;
+                end
+
+                if (isfield(tmpInfoDcm, 'TriggerTime')) infoDcm(k).tt= tmpInfoDcm.TriggerTime;
+                else infoDcm(k).tt=0;
+                end
+
+                if isempty(find(enum.b==infoDcm(k).b)) enum.b=[enum.b infoDcm(k).b];        
+                end
+
+                if isempty(find(enum.slc==infoDcm(k).slc)) enum.slc=[enum.slc infoDcm(k).slc];        
+                end
+
+                enum.TE(1)=tmpInfoDcm.EchoTime;
+                enum.TR=tmpInfoDcm.RepetitionTime;
+                enum.Pixel=tmpInfoDcm.PixelSpacing;
+                enum.Thickness=tmpInfoDcm.SliceThickness;
+                k=k+1;
            end
-           
-            if (isfield(tmpInfoDcm, 'Slice_per_mosa'))
-                infoDcm(k).slicePerMosa=tmpInfoDcm.Slice_per_mosa;
-                enum.mosa=tmpInfoDcm.Slice_per_mosa;
-            else 
-                infoDcm(k).slicePerMosa=1;
-                enum.mosa=1;
-            end
-             
-            if (isfield(tmpInfoDcm, 'TriggerTime')) infoDcm(k).tt= tmpInfoDcm.TriggerTime;
-            else infoDcm(k).tt=0;
-            end
-            
-            if isempty(find(enum.b==infoDcm(k).b)) enum.b=[enum.b infoDcm(k).b];        
-            end
-            
-            if isempty(find(enum.slc==infoDcm(k).slc)) enum.slc=[enum.slc infoDcm(k).slc];        
-            end
-            
-            enum.TE(1)=tmpInfoDcm.EchoTime;
-            enum.TR=tmpInfoDcm.RepetitionTime;
-            enum.Pixel=tmpInfoDcm.PixelSpacing;
-            enum.Thickness=tmpInfoDcm.SliceThickness;
-            k=k+1;
         end
         waitbar(cpt/size(listing,1),h);  
     end
@@ -242,8 +245,14 @@ function [Dcm enum]= AnalyseDataSet_KM(varargin)
      for cpt_slc=1:1:enum.datasize(dataset_num).slc
        for cpt_b=1:1:enum.datasize(dataset_num).b     
           for cpt_dir=1:1: enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).nb_dir           
-             for cpt_avg=1:1: enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).nb_avg 
-                     Dcm(:,:,cpt_slc,cpt_b,cpt_dir,cpt_avg)=double(dicomread(enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).filename));
+             for cpt_avg=1:1: enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).nb_avg
+                 
+                  tmp_dcm=double(dicomread(enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).filename));
+                  if size(tmp_dcm,1)==size(Dcm,1)
+                    Dcm(:,:,cpt_slc,cpt_b,cpt_dir,cpt_avg)=double(dicomread(enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).filename));
+                  else
+                    Dcm(:,:,cpt_slc,cpt_b,cpt_dir,cpt_avg)=double(dicomread(enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).filename)'); 
+                  end
              end
            end
         end

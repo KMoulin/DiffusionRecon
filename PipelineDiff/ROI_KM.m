@@ -1,6 +1,6 @@
 function[P_Endo,P_Epi,LV_Mask,Mask_Depth]= ROI_KM(Dcm)
 
-%  Draw a ROI for each Slice and apply it to the DWI matrix 
+%  Draw an Endo and Epi ROI for each Slice and apply it to the DWI matrix 
 %  
 % SYNTAX:  [P_Endo,P_Epi,LV_mask_slc]= ROI_KM(Dcm)
 %  
@@ -16,9 +16,14 @@ function[P_Endo,P_Epi,LV_Mask,Mask_Depth]= ROI_KM(Dcm)
 %           LV_Mask - Mask matrix 
 %                 [y x slices]
 %
-% Kevin Moulin 08.14.2017
+%           Mask_Depth - Mask of depth based on the Epi/Endo countour 
+%                 [y x slices]
+%
+%
+% Kevin Moulin 01.13.2020
 % Kevin.Moulin.26@gmail.com
-% Ennis Lab @ UCLA; http://mrrl.ucla.edu
+% Ennis Lab @ UCLA: http://mrrl.ucla.edu
+% Ennis Lab @ Stanford: https://med.stanford.edu/cmrgroup/software.html
 
     P_Endo=[];
     P_Epi=[];
@@ -77,7 +82,7 @@ clear 'hendo';
 figure; title(gca,['Pick up to ' int2str(nEpi_max) ' points around the border around the epicardium']);
 imagesc(IM,[min(min(IM)) max(max(IM))]); hold on; % here just view the image you want to base your borders on
  colormap('jet')
- caxis([0 200])
+% caxis([0 4*nanmedian(nanmedian(IM))])
 epi_tmp = zeros(nEpi_max,2);
  
 for j = 1:nEpi_max

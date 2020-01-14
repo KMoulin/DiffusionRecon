@@ -30,10 +30,12 @@ function [Tensor, EigValue,EigVector,MD,FA,Trace_DTI]= Calc_Tensor_KM(varargin)
 %
 %           Trace_DTI - Trace image from Tensor
 %                 [y x slices b-values]
+%           
 %
-% Kevin Moulin 08.14.2017
+% Kevin Moulin 01.13.2020
 % Kevin.Moulin.26@gmail.com
-% Ennis Lab @ UCLA; http://mrrl.ucla.edu
+% Ennis Lab @ UCLA: http://mrrl.ucla.edu
+% Ennis Lab @ Stanford: https://med.stanford.edu/cmrgroup/software.html
 
     Tensor=[];
     EigValue=[];

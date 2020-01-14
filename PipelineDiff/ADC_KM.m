@@ -15,9 +15,10 @@ function [ADC]= ADC_KM(Dcm, enum)
 %                 [y x slices b-values directions averages dataset]
 %
 %
-% Kevin Moulin 08.14.2017
+% Kevin Moulin 01.13.2020
 % Kevin.Moulin.26@gmail.com
-% Ennis Lab @ UCLA; http://mrrl.ucla.edu
+% Ennis Lab @ UCLA: http://mrrl.ucla.edu
+% Ennis Lab @ Stanford: https://med.stanford.edu/cmrgroup/software.html
    
     
     ADC=[];

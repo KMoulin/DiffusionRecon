@@ -18,10 +18,12 @@ function [Dcm2 enum2]= tMIP_KM(Dcm, enum)
 %
 %           
 %           enum2 - Structure which contains information about the dataset 
+%           
 %
-% Kevin Moulin 08.14.2017
+% Kevin Moulin 01.13.2020
 % Kevin.Moulin.26@gmail.com
-% Ennis Lab @ UCLA; http://mrrl.ucla.edu
+% Ennis Lab @ UCLA: http://mrrl.ucla.edu
+% Ennis Lab @ Stanford: https://med.stanford.edu/cmrgroup/software.html
    
 
     enum2=enum; 

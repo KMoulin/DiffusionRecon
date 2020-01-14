@@ -5,7 +5,7 @@ function   [Dcm2, enum2]= Demosa_KM(Dcm, enum)
 % Update enum to count the number of slices properly
 %
 %
-% SYNTAX:  [Dcm2 DcmB02,enum2]= Demosa_KM(Dcm, DcmB0, enum);
+% SYNTAX:  [Dcm2 enum2]= Demosa_KM(Dcm, enum);
 %  
 %
 % INPUTS:   Dcm - DWI image matrix
@@ -17,16 +17,17 @@ function   [Dcm2, enum2]= Demosa_KM(Dcm, enum)
 %                 [y x slices b-values directions averages dataset]
 %                
 %           enum2 - Structure which contains information about the dataset
-%           
+% 
 %
-% Kevin Moulin 08.14.2017
+% Kevin Moulin 01.13.2020
 % Kevin.Moulin.26@gmail.com
-% Ennis Lab @ UCLA; http://mrrl.ucla.edu
+% Ennis Lab @ UCLA: http://mrrl.ucla.edu
+% Ennis Lab @ Stanford: https://med.stanford.edu/cmrgroup/software.html
    
 
     Dcm2=[];
     enum2=enum;
-    div=find_division_mosa(enum.mosa);
+    div=find_division_mosa(enum.mosa)
     if enum.mosa>1
         disp('Unmosaic');
         h = waitbar(0,'Unmosaic...');
@@ -100,5 +101,9 @@ function [div]=find_division_mosa(slice_per_mosa)
             div=10;            
        elseif slice_per_mosa>101 & slice_per_mosa <=121
             div=11;
+        elseif slice_per_mosa>121 & slice_per_mosa <=144
+            div=12;
+       else
+           div=1;
        end    
 end
