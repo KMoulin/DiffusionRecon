@@ -47,24 +47,23 @@ function [Dcm2 enum2]= Trace_KM(varargin)
     h = waitbar(0,'Trace...');
      for cpt_set=1:1:enum.nset
         for cpt_slc=1:1:enum.datasize(cpt_set).slc
-             for cpt_b=1:1:enum.datasize(cpt_set).b             
-                       if(cpt_b>1)
+             for cpt_b=1:1:enum.datasize(cpt_set).b    
+                 for cpt_avg=1:1: enum.dataset(cpt_set).slc(cpt_slc).b(cpt_b).dir(1).nb_avg  
+                     
                            %Dcm2(:,:,cpt_slc,(cpt_b-1),1,:)=nthroot(tmpDcmB2,enum.dataset(cpt_b).dirNum);
                            if(mod==1)
-                               Dcm2(:,:,cpt_slc,cpt_b,1,1,cpt_set )=mean(Dcm(:,:,cpt_slc,cpt_b,:,:,cpt_set),5); % For now just mean but later calculate true trace !
+                               Dcm2(:,:,cpt_slc,cpt_b,1,cpt_avg,cpt_set )=mean(Dcm(:,:,cpt_slc,cpt_b,1:enum.dataset(cpt_set).slc(cpt_slc).b(cpt_b).nb_dir,cpt_avg,cpt_set),5); % For now just mean but later calculate true trace !
                            elseif(mod==2)
-                               Dcm2(:,:,cpt_slc,cpt_b,1,1,cpt_set )=median(Dcm(:,:,cpt_slc,cpt_b,:,:,cpt_set),5); % For now just mean but later calculate true trace !
+                               Dcm2(:,:,cpt_slc,cpt_b,1,cpt_avg,cpt_set )=median(Dcm(:,:,cpt_slc,cpt_b,1:enum.dataset(cpt_set).slc(cpt_slc).b(cpt_b).nb_dir,cpt_avg,cpt_set),5); % For now just mean but later calculate true trace !
                            elseif (mod==3)
-                               Dcm2(:,:,cpt_slc,cpt_b,1,1,cpt_set )=max(Dcm(:,:,cpt_slc,cpt_b,:,:,cpt_set),[],5); % For now just mean but later calculate true trace !
+                               Dcm2(:,:,cpt_slc,cpt_b,1,cpt_avg,cpt_set )=max(Dcm(:,:,cpt_slc,cpt_b,1:enum.dataset(cpt_set).slc(cpt_slc).b(cpt_b).nb_dir,cpt_avg,cpt_set),[],5); % For now just mean but later calculate true trace !
                            elseif (mod==4)
-                               Dcm2(:,:,cpt_slc,cpt_b,1,1,cpt_set )=min(Dcm(:,:,cpt_slc,cpt_b,:,:,cpt_set),[],5); % For now just mean but later calculate true trace !
+                               Dcm2(:,:,cpt_slc,cpt_b,1,cpt_avg,cpt_set )=min(Dcm(:,:,cpt_slc,cpt_b,1:enum.dataset(cpt_set).slc(cpt_slc).b(cpt_b).nb_dir,cpt_avg,cpt_set),[],5); % For now just mean but later calculate true trace !
                            else
-                               Dcm2(:,:,cpt_slc,cpt_b,1,1,cpt_set )=mean(Dcm(:,:,cpt_slc,cpt_b,:,:,cpt_set),5); % For now just mean but later calculate true trace !
-                           end
-                       else
-                           Dcm2(:,:,cpt_slc,cpt_b,1,1,cpt_set )=Dcm(:,:,cpt_slc,cpt_b,1,1 ,cpt_set);
-                       end
+                               Dcm2(:,:,cpt_slc,cpt_b,1,cpt_avg,cpt_set )=mean(Dcm(:,:,cpt_slc,cpt_b,1:enum.dataset(cpt_set).slc(cpt_slc).b(cpt_b).nb_dir,cpt_avg,cpt_set),5); % For now just mean but later calculate true trace !
+                           end 
                        enum2.dataset(cpt_set).slc(cpt_slc).b(cpt_b).nb_dir =1;
+                 end
              end    
            waitbar(cpt_slc/enum.datasize(cpt_set).slc,h);
         end
