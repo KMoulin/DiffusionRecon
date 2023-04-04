@@ -1,5 +1,5 @@
 
-function [UI]=UIDiffRecon_KM(options_mode)
+function [UI]=UIDiffRecon_KM(varargin)
      
 
 %  Generate an user interface with checkable otpions that returns a matrix
@@ -23,20 +23,25 @@ function [UI]=UIDiffRecon_KM(options_mode)
 % Kevin.Moulin.26@gmail.com
 % Ennis Lab @ UCLA; http://mrrl.ucla.edu
 
-    if (~exist('options_mode', 'var'))
-        options_mode = false;
+      if numel(varargin) == 1
+          options_mode=varargin{1};
+          [UI]=load_default();
+          
+
+    elseif numel(varargin) == 2
+          options_mode=varargin{1};
+          UI=varargin{2}(1);
     else
-        if options_mode ~= true && options_mode ~=false 
-            options_mode = false;
-        end
+          options_mode=true;
+          [UI]=load_default();
     end
     
-    [UI]=load_default();
+   
 
 if options_mode==true
     disp('Select Options');
-    h_fig =   figure( 'BackingStore', 'on','DoubleBuffer','on','Render', 'zbuffer','Name', 'Pcatmip Options','NumberTitle','off','MenuBar','none','DockControls', 'off','Toolbar','none','units', 'characters','Position',[10 10 80 22],'Units','characters');
-    hp_config = uipanel( 'Title','Reconstruction parameter','units', 'characters','Position',[1 1 78 20]);
+    h_fig =   figure( 'BackingStore', 'on','DoubleBuffer','on','Render', 'zbuffer','Name', 'Recon Options','NumberTitle','off','MenuBar','none','DockControls', 'off','Toolbar','none','units', 'characters','Position',[10 10 80 22],'Units','characters');
+    hp_config = uipanel( 'Title','Reconstruction parameters','units', 'characters','Position',[1 1 78 20]);
     
     %%%% Ligne 1 %%%%
     hu_inter =           uicontrol('parent', hp_config, 'Style','checkbox', 'units', 'characters', 'Position',[1 15 25 3], 'String', 'Interpolation','Value', UI.inter_mode);
@@ -55,12 +60,12 @@ if options_mode==true
     %%%% Ligne 3 %%%%
     hu_dti=             uicontrol('parent', hp_config, 'Style','checkbox', 'units', 'characters', 'Position',[50 15 25 3], 'String', 'DTI','Value', UI.DTI_mode);
     hu_adc=             uicontrol('parent', hp_config, 'Style','checkbox', 'units', 'characters', 'Position',[50 13 25 3], 'String', 'ADC','Value', UI.ADC_mode);
-    hu_ivim=            uicontrol('parent', hp_config, 'Style','checkbox', 'units', 'characters', 'Position',[50 11 25 3], 'String', 'IVIM','Value', UI.IVIM_mode);
+    hu_ivim=            uicontrol('parent', hp_config, 'Style','checkbox', 'units', 'characters', 'Position',[50 11 25 3], 'String', 'IVIM','Value', UI.IVIM_mode,'Enable','off');
     hu_mosa =           uicontrol('parent', hp_config, 'Style','checkbox', 'units', 'characters', 'Position',[50 9 25 3], 'String', 'Unmosaic','Value', UI.mosa_mode);
     hu_gif =            uicontrol('parent', hp_config, 'Style','checkbox', 'units', 'characters', 'Position',[50 7 20 3], 'String', 'Gif','Value', UI.gif_mode);
       
-    hu_valid =          uicontrol('parent', hp_config, 'style','pushbutton','units','characters', 'TooltipString', 'Run the function','tag', 'hu_info','String', 'GO','Position',           [10 1 25 3],'Callback', @buttonCallback);
-    hu_save =           uicontrol('parent', hp_config, 'style','pushbutton','units','characters', 'TooltipString', 'Run the function','tag', 'hu_info','String', 'save default','Position', [40 1 25 3],'Callback', @buttonCallback);
+    hu_valid =          uicontrol('parent', hp_config, 'style','pushbutton','units','characters', 'TooltipString', 'Run the function','tag', 'hu_info','String', 'Validate','Position',           [10 1 25 3],'Callback', @buttonCallback);
+    hu_save =           uicontrol('parent', hp_config, 'style','pushbutton','units','characters', 'TooltipString', 'Run the function','tag', 'hu_info','String', 'Save default','Position', [40 1 25 3],'Callback', @buttonCallback);
     waitfor(h_fig);
 
 end

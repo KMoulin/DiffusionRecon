@@ -46,6 +46,11 @@ function [HA_filter]= HA_Filter_KM(HA, LV_mask, Mask_Depth,display)
     ListDist2(isnan(ListDist))=[];
     ListHA2(isnan(ListHA))=[];
     
+    %% HA has to be flipped
+    if nanmedian(ListHA2(find(ListDist2<0.1)))<0
+        ListHA=-ListHA;
+    end
+    
     f = fittype('a*x+b'); 
     fit1 = fit(ListDist2,ListHA2,f,'StartPoint',[1 1]);
     fdata = feval(fit1,ListDist); 

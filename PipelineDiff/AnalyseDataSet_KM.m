@@ -58,75 +58,67 @@ function [Dcm enum]= AnalyseDataSet_KM(varargin)
     
     k=1;
     
-    infoDcm=[]; % infoDcm containt, the b value, dir, position and td of each files !
+   % infoDcm=[]; % infoDcm containt, the b value, dir, position and td of each files !
     FolderName=[];
-     VectTime=[];
+    VectTime=[];
     Dcm=[];
 
     
-%     enum=[];
-%     enum.slc=[];     
-%     enum.b=[];
-%     enum.dataset=[];
-%     enum.dataset(dataset_num).slc=[];
-    for cpt=3:1:size(listing,1)
-        if listing(cpt).name(end-2:end) == 'dcm' | listing(cpt).name(end-2:end) == 'IMA'
+    for cpt=1:1:length(listing)
+        
+        
+        [FolderName, name, fExt] = fileparts([listing(cpt).folder '\' listing(cpt).name]);
+        
+        if (strcmp(fExt, '.dcm') | strcmp(fExt, '.IMA') | isempty(fExt)) & ~listing(cpt).isdir % if listing(cpt).name(end-2:end) == 'dcm' | listing(cpt).name(end-2:end) == 'IMA'
             
-            tmpInfoDcm=dicominfo(listing(cpt).name);
+                tmpInfoDcm=dicominfo([FolderName '\' listing(cpt).name]);
             
-            if (isfield(tmpInfoDcm, 'Directionality'))  % check if the file is a valid diffusion file
-                [FolderName,name,ext] = fileparts(listing(cpt).name);
-
-                infoDcm(k).name=[name ext]; 
-
-                tmpV=tmpInfoDcm.AcquisitionTime;
-
-                infoDcm(k).AcqTime= (str2double(tmpV(1,1:2))*60*60+str2double(tmpV(1,3:4))*60+str2double(tmpV(1,5:6))) + str2double(tmpV(1,8))*10^-1 + str2double(tmpV(1,9))*10^-2 + str2double(tmpV(1,10))*10^-3 + str2double(tmpV(1,11))*10^-4;  %s
-                VectTime(k)=infoDcm(k).AcqTime;
+               %if (isfield(tmpInfoDcm, 'Directionality'))  % check if the file is a valid diffusion file
+               
+               
+                
+                if strcmpi('Siemens',tmpInfoDcm.Manufacturer)
+                     infoDcm(k)=  Extract_info_SIEMENS(tmpInfoDcm); % Fill the struct with essential information          
+                elseif strcmpi('Philips',tmpInfoDcm.Manufacturer) 
+                      infoDcm(k)=Extract_info_PHILIPS(tmpInfoDcm);
+                elseif  strcmpi('GE',tmpInfoDcm.Manufacturer)
+                 
+                else
+                    infoDcm(k)=  Extract_info_SIEMENS(tmpInfoDcm); % Fill the struct with essential information
+                end
+                
+                infoDcm(k).filename=[name fExt];
+                infoDcm(k).foldername=FolderName;
+                 VectTime(k)=infoDcm(k).AcqTime;
            
-               if  (strcmp(tmpInfoDcm.Directionality,'NONE') || strcmp(tmpInfoDcm.SequenceName,'ep_b0'))                       
-                   infoDcm(k).b = 0;% tmpInfoDcm.Bvalue;
-                   infoDcm(k).slc = tmpInfoDcm.SliceLocation; 
-                   infoDcm(k).dirV=[0 0 0];
-               else  
-                   infoDcm(k).b = tmpInfoDcm.Bvalue;
-                   infoDcm(k).slc = tmpInfoDcm.SliceLocation; 
-                   if (strcmp(tmpInfoDcm.Directionality,'DIRECTIONAL') &&isfield(tmpInfoDcm, 'DiffusionDirection'))
-                        ImOrien=tmpInfoDcm.ImageOrientationPatient;
-                        Im_3=cross(ImOrien(1:3),ImOrien(4:6));
-                        Im_1=ImOrien(1:3); % attention: this is because matlab read first the colume and second the row
-                        Im_2=ImOrien(4:6);     
-                        infoDcm(k).dirV = ([Im_1';Im_2';Im_3']* tmpInfoDcm.DiffusionDirection)';
-                   else
-                        disp('diffusion direction not found')    
-                        infoDcm(k).dirV = [0 0 0];
-                   end
-               end
-
-                if (isfield(tmpInfoDcm, 'Slice_per_mosa'))
-                    infoDcm(k).slicePerMosa=tmpInfoDcm.Slice_per_mosa;
-                    enum.mosa=tmpInfoDcm.Slice_per_mosa;
+               
+                if infoDcm(k).slicePerMosa>1
+                    enum.mosa=infoDcm(k).slicePerMosa;
                 else 
-                    infoDcm(k).slicePerMosa=1;
                     enum.mosa=1;
                 end
 
-                if (isfield(tmpInfoDcm, 'TriggerTime')) infoDcm(k).tt= tmpInfoDcm.TriggerTime;
-                else infoDcm(k).tt=0;
+                
+
+                if isempty(find(enum.b==infoDcm(k).b)) 
+                    enum.b=[enum.b infoDcm(k).b];        
                 end
 
-                if isempty(find(enum.b==infoDcm(k).b)) enum.b=[enum.b infoDcm(k).b];        
+                if isempty(find(enum.slc==infoDcm(k).slc)) 
+                    enum.slc=[enum.slc infoDcm(k).slc];        
                 end
-
-                if isempty(find(enum.slc==infoDcm(k).slc)) enum.slc=[enum.slc infoDcm(k).slc];        
-                end
-
-                enum.TE(1)=tmpInfoDcm.EchoTime;
-                enum.TR=tmpInfoDcm.RepetitionTime;
-                enum.Pixel=tmpInfoDcm.PixelSpacing;
-                enum.Thickness=tmpInfoDcm.SliceThickness;
+                
+                enum.TE(1)=infoDcm(k).EchoTime;
+                enum.TR=infoDcm(k).RepetitionTime;
+                enum.Pixel=infoDcm(k).PixelSpacing;
+                enum.Thickness=infoDcm(k).SliceThickness;
+                enum.dcm_dir=FolderName;
+                enum.SerieUID=tmpInfoDcm.SeriesInstanceUID;
+                enum.PatientUID=tmpInfoDcm.StudyInstanceUID;
+                enum.ImOrien=tmpInfoDcm.ImageOrientationPatient;
+                enum.dTrans=tmpInfoDcm.ImagePositionPatient;
                 k=k+1;
-           end
+           %end
         end
         waitbar(cpt/size(listing,1),h);  
     end
@@ -138,6 +130,8 @@ function [Dcm enum]= AnalyseDataSet_KM(varargin)
     h = waitbar(0,'Generate enumerator...');   
   
     %%% Build Enum Size %%%  
+    enum.b=sort(enum.b);
+    enum.slc=sort(enum.slc);
     enum.datasize(dataset_num).b=size(enum.b,2);
     enum.datasize(dataset_num).slc=size(enum.slc,2);
     enum.datasize(dataset_num).dir=1;
@@ -157,16 +151,13 @@ function [Dcm enum]= AnalyseDataSet_KM(varargin)
                     enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).tt=0;
                     enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).acquTime=0;
                     enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).filename=0;
+                    enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).foldername=0;
                     enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).dirVector=[];
                 end
             end
         end
     end
 
-    cpt_b=0;
-    cpt_slc=0;
-    cpt_dir=0;
-    cpt_avg=0;
     
     %%% Fill Enum %%%
     for cpt=1:1:size(infoDcm,2)    
@@ -182,7 +173,7 @@ function [Dcm enum]= AnalyseDataSet_KM(varargin)
             enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir=[];
             enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dirVector=infoDcm(cpt).dirV'; 
             enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(1).nb_avg=1;
-            enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(1).avg=[];
+            %enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(1).avg=[];
             
             
         %%% New direction %%%
@@ -194,7 +185,7 @@ function [Dcm enum]= AnalyseDataSet_KM(varargin)
             enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).nb_dir=enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).nb_dir+1;
             enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dirVector=[enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dirVector infoDcm(cpt).dirV']; 
             enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).nb_avg=1;
-            enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg=[];
+            %enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg=[];
             
 
             
@@ -204,19 +195,26 @@ function [Dcm enum]= AnalyseDataSet_KM(varargin)
             cpt_dir=(find(ismember(enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dirVector',infoDcm(cpt).dirV,'Rows')==1));    % Number of the current direction
             cpt_avg=enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).nb_avg+1; 
             
-            enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).nb_avg=enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).nb_avg+1;
-            
-%            enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg)=[];
-          
+            enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).nb_avg=enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).nb_avg+1;       
         end 
         
         %%% Store Informations
-        
-        enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).tt=infoDcm(cpt).tt;       
-        enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).dirVector=infoDcm(cpt).dirV;        
-        enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).acquTime=infoDcm(cpt).AcqTime-min(VectTime);
-        enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).filename=infoDcm(cpt).name;
-              
+         enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg)= infoDcm(cpt);
+         
+         
+%         enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).tt=infoDcm(cpt).tt;       
+%         enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).dirVector=infoDcm(cpt).dirV;        
+%         enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).acquTime=infoDcm(cpt).AcqTime-min(VectTime);
+%         enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).filename=infoDcm(cpt).name;
+%         
+%         enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).=InfoStruct.ImOrien = tmpInfoDcm.ImageOrientationPatient; 
+%         InfoStruct.ImPos   =  tmpInfoDcm.ImagePositionPatient;
+%         InfoStruct.slc = tmpInfoDcm.SliceLocation; 
+%         
+%         InfoStruct.EchoTime;
+%         InfoStruct.TR=tmpInfoDcm.RepetitionTime;
+%         InfoStruct.Pixel=tmpInfoDcm.PixelSpacing;
+%         InfoStruct.Thickness=tmpInfoDcm.SliceThickness;
             
          if cpt_dir>   enum.datasize(dataset_num).dir
              enum.datasize(dataset_num).dir=cpt_dir;
@@ -240,26 +238,29 @@ function [Dcm enum]= AnalyseDataSet_KM(varargin)
      h = waitbar(0,'Create Volumes...'); 
      
      %%% Memory pre-alloc
-     Dcm=zeros(size(double(dicomread(infoDcm(1).name)),1),size(double(dicomread(infoDcm(1).name)),2), enum.datasize(dataset_num).slc, enum.datasize(dataset_num).b, enum.datasize(dataset_num).dir, enum.datasize(dataset_num).avg);
+     Dcm=zeros(size(double(dicomread([infoDcm(1).foldername '/' infoDcm(1).filename])),1),size(double(dicomread([infoDcm(1).foldername  '/' infoDcm(1).filename])),2), enum.datasize(dataset_num).slc, enum.datasize(dataset_num).b, enum.datasize(dataset_num).dir, enum.datasize(dataset_num).avg);
 
      for cpt_slc=1:1:enum.datasize(dataset_num).slc
        for cpt_b=1:1:enum.datasize(dataset_num).b     
           for cpt_dir=1:1: enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).nb_dir           
              for cpt_avg=1:1: enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).nb_avg
                  
-                  tmp_dcm=double(dicomread(enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).filename));
+                  tmp_dcm=double(dicomread([enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).foldername '/' enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).filename]));
                   if size(tmp_dcm,1)==size(Dcm,1)
-                    Dcm(:,:,cpt_slc,cpt_b,cpt_dir,cpt_avg)=double(dicomread(enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).filename));
+                    Dcm(:,:,cpt_slc,cpt_b,cpt_dir,cpt_avg)=double(dicomread([enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).foldername '\' enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).filename]));
                   else
-                    Dcm(:,:,cpt_slc,cpt_b,cpt_dir,cpt_avg)=double(dicomread(enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).filename)'); 
+                    Dcm(:,:,cpt_slc,cpt_b,cpt_dir,cpt_avg)=double(dicomread([enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).foldername '\' enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).filename])'); 
                   end
              end
            end
         end
         waitbar(cpt_slc/size(enum.slc,2),h);
-      end
-      close(h);
+     end
+     %%% Just for safety.
+     close(h);
      
+      
+      
      disp('Generate timing tab') % Count how many there are of Td, b value, direction and slc and store all in the enum !
      h = waitbar(0,'Generate timing tab...'); 
        
@@ -274,7 +275,7 @@ function [Dcm enum]= AnalyseDataSet_KM(varargin)
                for cpt_b=1:1:enum.datasize(dataset_num).b     
                   for cpt_dir=1:1: enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).nb_dir           
                      for cpt_avg=1:1: enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).nb_avg 
-                             if(enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).acquTime==VectTime(cpt_time))
+                             if(enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).AcqTime==VectTime(cpt_time))
                                  enum.Timing.time(cpt_time)=VectTime(cpt_time);
                                  enum.Timing.RR(cpt_time)=1000*VectRR(cpt_time);
                                  enum.Timing.slice(cpt_time)=cpt_slc;
@@ -294,9 +295,8 @@ function [Dcm enum]= AnalyseDataSet_KM(varargin)
                for cpt_b=1:1:enum.datasize(dataset_num).b     
                   for cpt_dir=1:1: enum.dataset(dataset_num).slc(1).b(cpt_b).nb_dir           
                      for cpt_avg=1:1: enum.dataset(dataset_num).slc(1).b(cpt_b).dir(cpt_dir).nb_avg 
-                             if(enum.dataset(dataset_num).slc(1).b(cpt_b).dir(cpt_dir).avg(cpt_avg).acquTime==VectTime(cpt_time))
+                             if(enum.dataset(dataset_num).slc(1).b(cpt_b).dir(cpt_dir).avg(cpt_avg).AcqTime==VectTime(cpt_time))
                                 for cpt_slc=1:1:enum.mosa
-                                % slice_order=[1 3 5 2 4];
                                  slice_order=[1:1:enum.mosa];
                                  enum.Timing.time(cpt)=VectTime(cpt_time);
                                  enum.Timing.RR(cpt)=double(1000*VectRR(cpt_time)./enum.mosa);
@@ -316,11 +316,146 @@ function [Dcm enum]= AnalyseDataSet_KM(varargin)
       close(h);
     
          
- for cpt_b=2:1:enum.datasize.b  
-    Write_grad_file_KM(enum.dataset(dataset_num).slc(1).b(cpt_b).dirVector',cpt_b-1);
- end
- 
- 
+%  for cpt_b=2:1:enum.datasize.b  
+%     Write_grad_file_KM(enum.dataset(dataset_num).slc(1).b(cpt_b).dirVector',cpt_b-1);
+%  end
+%  
+end
+function InfoStruct=Extract_info_SIEMENS(tmpInfoDcm)
+
+        InfoStruct.filename=[];
+        InfoStruct.foldername=[];
+        dir=0;
+       if (isfield(tmpInfoDcm, 'Bvalue'))    
+           bval=tmpInfoDcm.Bvalue;
+       elseif isfield(tmpInfoDcm, 'Private_0021_1105')    % update XA20 +
+           bval=tmpInfoDcm.Private_0021_1105;
+       elseif isfield(tmpInfoDcm,'Private_0021_1177') % update XA20 +
+           if ~isempty(strfind(tmpInfoDcm.Private_0021_1177,'ep_b'))
+               if ~isempty(strfind(tmpInfoDcm.Private_0021_1177,'#'))
+                 bval=str2num(tmpInfoDcm.SequenceName(strfind(tmpInfoDcm.Private_0021_1177,'b')+1:strfind(tmpInfoDcm.Private_0021_1177,'#')-1));
+                 dir=str2num(tmpInfoDcm.SequenceName(strfind(tmpInfoDcm.Private_0021_1177,'#')+1:end));
+               else
+                 bval=0;
+               end
+           else
+               bval=0;
+           end
+       else
+           if ~isempty(strfind(tmpInfoDcm.SequenceName,'ep_b'))
+               if ~isempty(strfind(tmpInfoDcm.SequenceName,'#'))
+                 bval=str2num(tmpInfoDcm.SequenceName(strfind(tmpInfoDcm.SequenceName,'b')+1:strfind(tmpInfoDcm.SequenceName,'#')-1));
+                 dir=str2num(tmpInfoDcm.SequenceName(strfind(tmpInfoDcm.SequenceName,'#')+1:end));
+               else
+                 bval=0;
+               end
+           else
+               bval=0;
+           end
+       end
+       
+       
+       if   bval<10                
+           InfoStruct.b = 0;   
+           InfoStruct.dirV = [0 0 0];
+       else  
+           InfoStruct.b = bval;
+            if (isfield(tmpInfoDcm, 'DiffusionDirection')) %strcmp(tmpInfoDcm.Directionality,'DIRECTIONAL') &&
+                ImOrien=tmpInfoDcm.ImageOrientationPatient;
+                Im_3=cross(ImOrien(1:3),ImOrien(4:6));
+                Im_1=ImOrien(1:3); % attention: this is because matlab read first the colume and second the row
+                Im_2=ImOrien(4:6);     
+                InfoStruct.dirV = ([Im_1';Im_2';Im_3']* tmpInfoDcm.DiffusionDirection)';
+            elseif (isfield(tmpInfoDcm, 'Private_0021_1146')) % update XA20 +
+                ImOrien=tmpInfoDcm.ImageOrientationPatient;
+                Im_3=cross(ImOrien(1:3),ImOrien(4:6));
+                Im_1=ImOrien(1:3); % attention: this is because matlab read first the colume and second the row
+                Im_2=ImOrien(4:6);     
+                InfoStruct.dirV = ([Im_1';Im_2';Im_3']* tmpInfoDcm.Private_0021_1146)';
+            else
+               % disp('diffusion direction not found')    
+                InfoStruct.dirV = [dir 0 0];
+            end
+       end    
+       
+       if (isfield(tmpInfoDcm, 'Slice_per_mosa'))
+            InfoStruct.slicePerMosa=tmpInfoDcm.Slice_per_mosa;
+        else 
+            InfoStruct.slicePerMosa=1;
+       end
+        
+        InfoStruct.slc = tmpInfoDcm.SliceLocation;     
+           
+        if (isfield(tmpInfoDcm, 'TriggerTime')) 
+            InfoStruct.tt= tmpInfoDcm.TriggerTime;
+        else
+            InfoStruct.tt=0;
+        end
+
+        InfoStruct.ImOrien = tmpInfoDcm.ImageOrientationPatient; 
+        InfoStruct.ImPos   =  tmpInfoDcm.ImagePositionPatient;
+        InfoStruct.slc = tmpInfoDcm.SliceLocation; 
+        
+        InfoStruct.EchoTime= tmpInfoDcm.EchoTime;
+        InfoStruct.RepetitionTime=tmpInfoDcm.RepetitionTime;
+        InfoStruct.PixelSpacing=tmpInfoDcm.PixelSpacing;
+        InfoStruct.SliceThickness=tmpInfoDcm.SliceThickness;
+        
+        tmpV=tmpInfoDcm.AcquisitionTime;
+        InfoStruct.AcqTime=(str2double(tmpV(1,1:2))*60*60+str2double(tmpV(1,3:4))*60+str2double(tmpV(1,5:6))) + str2double(tmpV(1,8))*10^-1 + str2double(tmpV(1,9))*10^-2 + str2double(tmpV(1,10))*10^-3 + str2double(tmpV(1,11))*10^-4;  %s
+     
+    end
+
+function InfoStruct=Extract_info_PHILIPS(tmpInfoDcm)
+
+        InfoStruct.filename=[];
+        InfoStruct.foldername=[];
+       if (isfield(tmpInfoDcm, 'DiffusionBValue'))    
+           bval=tmpInfoDcm.DiffusionBValue;
+       else
+           bval=0;  
+       end
+       
+       
+       if   bval<10                
+           InfoStruct.b = 0;   
+           InfoStruct.dirV = [0 0 0];
+       else  
+           InfoStruct.b = bval;
+            if (isfield(tmpInfoDcm, 'DiffusionGradientOrientation')) %strcmp(tmpInfoDcm.Directionality,'DIRECTIONAL') &&
+                ImOrien=tmpInfoDcm.ImageOrientationPatient;
+                Im_3=cross(ImOrien(1:3),ImOrien(4:6));
+                Im_1=ImOrien(1:3); % attention: this is because matlab read first the colume and second the row
+                Im_2=ImOrien(4:6);     
+                InfoStruct.dirV = ([Im_1';Im_2';Im_3']* tmpInfoDcm.DiffusionGradientOrientation)';
+            else
+               % disp('diffusion direction not found')    
+                InfoStruct.dirV = [0 0 0];
+            end
+       end    
+       
+    
+        InfoStruct.slicePerMosa=1;
+
+        if (isfield(tmpInfoDcm, 'TriggerTime')) 
+            InfoStruct.tt= tmpInfoDcm.TriggerTime;
+        else
+            InfoStruct.tt=0;
+        end
+
+        InfoStruct.ImOrien = tmpInfoDcm.ImageOrientationPatient; 
+        InfoStruct.ImPos   =  tmpInfoDcm.ImagePositionPatient;
+        InfoStruct.slc = tmpInfoDcm.SliceLocation; 
+        
+        InfoStruct.EchoTime= tmpInfoDcm.EchoTime;
+        InfoStruct.RepetitionTime=tmpInfoDcm.RepetitionTime;
+        InfoStruct.PixelSpacing=tmpInfoDcm.PixelSpacing;
+        InfoStruct.SliceThickness=tmpInfoDcm.SliceThickness;
+        
+        tmpV=tmpInfoDcm.AcquisitionTime;
+        InfoStruct.AcqTime=(str2double(tmpV(1,1:2))*60*60+str2double(tmpV(1,3:4))*60+str2double(tmpV(1,5:6))) + str2double(tmpV(1,8))*10^-1 + str2double(tmpV(1,9))*10^-2 ;  %s
+     
+    end
 
 function  Write_grad_file_KM(directions,num)
 %
@@ -329,9 +464,7 @@ function  Write_grad_file_KM(directions,num)
     end
     fid = fopen(['grad_direction' num2str(num) '.txt'],'w');
     xt=size(directions,1);
-
-    %fprintf(fid,[num2str(xt)]);
-
+    
     for ij=1:1:xt
             fprintf(fid,['\n', num2str(directions(ij,1)), ' ', num2str(directions(ij,2)), ' ', num2str(directions(ij,3))]);
     end
@@ -340,4 +473,3 @@ function  Write_grad_file_KM(directions,num)
 
 end
 
-end

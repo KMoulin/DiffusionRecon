@@ -1,4 +1,4 @@
-function [HA TRA E2A]= HA_E2A_KM( EigVect1, EigVect2, Mask, P_Epi, P_Endo)
+function [HA TRA E2A RAD_s CIR_s LON_s]= HA_E2A_KM( EigVect1, EigVect2, Mask, P_Epi, P_Endo)
 
 % Calculates the angle (degrees) between the primary eigenvector and the SA
 % plane; epicardium and endocardium should be a series of points representing the
@@ -48,6 +48,13 @@ h = waitbar(0,'Generate HA...');
 E2A = zeros(size(Mask,1),size(Mask,2),size(Mask,3));
 HA = zeros(size(Mask,1),size(Mask,2),size(Mask,3));
 TRA = zeros(size(Mask,1),size(Mask,2),size(Mask,3));
+
+RAD_s=zeros(size(Mask,1),size(Mask,2),size(Mask,3),3);
+CIR_s=zeros(size(Mask,1),size(Mask,2),size(Mask,3),3);
+LON_s=zeros(size(Mask,1),size(Mask,2),size(Mask,3),3);
+ FLIP_s= zeros(size(Mask,1),size(Mask,2),size(Mask,3),3);
+                
+
 for z=1:size(Mask,3)
     
     Vec = zeros(npts,2);
@@ -77,7 +84,7 @@ for z=1:size(Mask,3)
     
     for y = 1:yres
         for x = 1:xres
-            if Mask(y,x,z) ~= 0
+            if Mask(y,x,z) ~= 0 & ~isnan(Mask(y,x,z))
                             
                 
 %                 if squeeze(EigVect1(y,x,z,3))>0
@@ -86,41 +93,44 @@ for z=1:size(Mask,3)
 %                     Fiber_vect = -squeeze(EigVect1(y,x,z,:));
 %                 end
                 
-                Fiber_vect = squeeze(EigVect1(y,x,z,:));
-                Sheet_vect = squeeze(EigVect2(y,x,z,:));
+                E1 = squeeze(EigVect1(y,x,z,:));
+                E1= E1./norm(E1);
+                E2 = squeeze(EigVect2(y,x,z,:));
                 
                 % Circunferiential Vector definition
                 Circ = [Vx(y,x) Vy(y,x) 0];
-                
+                Circ= Circ./norm(Circ);
                 % Longitudinal Vector definition
                 Long= [0 0 1];
                 
                 % Projection of the Fiber Vector onto the Circunferential
                 % direction 
-                tProj=dot(Fiber_vect,Circ)*Circ/(norm(Circ)^2);
-                Fiber_proj=[tProj(1) tProj(2) Fiber_vect(3)];
+                E1proj=dot(E1,Circ)*Circ/(norm(Circ)^2);
+                Fiber_proj=[E1proj(1) E1proj(2) E1(3)];
                              
                 Fiber_proj=Fiber_proj./norm(Fiber_proj);
                 
-                HA(y,x,z) = asin(Fiber_proj(3)/norm(Fiber_proj))*180/(pi);
+                
+                %HA(y,x,z) = atan2(Fiber_proj(3), norm([E1proj(1) E1proj(2) 0]))*180/(pi);
+               HA(y,x,z) = asin(Fiber_proj(3)/norm(Fiber_proj))*180/(pi);
                 
               
                 % Radial Vector definition
                 Rad=cross(Circ/norm(Circ),Long/norm(Long));
                 
                 MidFiber=cross(Fiber_proj/norm(Fiber_proj),Rad/norm(Rad));
-                
+                %MidFiber=cross(E1/norm(E1),Rad/norm(Rad));
                 
                 % Projection of the Sheet Vector onto the Radial
                 % direction 
-                tProj2=dot(Sheet_vect,Rad)*Rad/(norm(Rad)^2);
+                E2proj=dot(E2,Rad)*Rad/(norm(Rad)^2);
                 
                 % Projection of the Sheet Vector onto the MidFiber
                 % direction 
-                tProj3=dot(Sheet_vect,MidFiber)*MidFiber/(norm(MidFiber)^2);
+                tProj3=dot(E2,MidFiber)*MidFiber/(norm(MidFiber)^2);
                 
                              
-                E2A(y,x,z) = atan2(norm(tProj2),norm(tProj3))*180/(pi);
+                E2A(y,x,z) = atan2(norm(E2proj),norm(tProj3))*180/(pi);
                 
                 
                 
@@ -133,15 +143,23 @@ for z=1:size(Mask,3)
                 
                % TRA(y,x,z) = asin(zComp/hyp)*180/(pi);
                 
-                
-                
-                
-                
+                RAD_s(y,x,z,:)=Rad;
+                CIR_s(y,x,z,:)=Circ;
+                LON_s(y,x,z,:)=Long;
+                FLIP_s(y,x,z,:)=Fiber_proj;
 %                test(y,x,z)=dot(tang,tProj);
-                if dot(Circ,Fiber_vect) > 0 %&& HA(j,k) > 0  %dot(tang,tProj) > 0
+
+                %tang = [Vx(y,x) Vy(y,x) 0];
+                 if dot(Fiber_proj  ,Circ) <0 % || dot(Fiber_proj,Long) > 0%dot(Circ,(E1)) < 0   %
                     HA(y,x,z) = -HA(y,x,z);
-                end
+                   %  FLIP_s(y,x,z)=1;
+                 end
                 
+%                   if abs(Rad(2))>abs(Rad(1))
+%                     HA(y,x,z) = -HA(y,x,z);
+%                     FLIP_s(y,x,z)=1;
+%                   end
+                 
                 if dot(vect2,Circ) < 0 %&& HA(j,k) > 0
                     TRA(y,x,z) = TRA(y,x,z)-180;
                 end

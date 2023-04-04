@@ -1,0 +1,396 @@
+% Demons Registration
+
+function demons
+
+figure(1); clf; colormap gray;
+
+%% Parameters
+niter           = 250;
+sigma_fluid     = 3.0; % regularize update      field
+sigma_diffusion = 1.0; % regularize deformation field
+sigma_i         = 1.0; % weight on similarity term
+sigma_x         = 1.0; % weight on spatial uncertainties (maximal step)
+diffeomorphic   = 1;   % use exp(u)
+nlevel          = 4;   % multiresolution
+do_display      = 1;   % display iterations
+
+%% Load fixed image
+load('F:\Matlab_HJ\fastMBD\registration\demons\demons2d\data\MOCO.mat');
+F=moco(:,:,2,1);
+% F = double(imread('data/heart-64.png'));          % fixed   image
+%F = double(imread('statue-rio.png'));           % fixed   image
+F = imresize(F,0.5);
+F = 256*(F-min(F(:)))/range(F(:));              % normalize intensities
+
+%% Load moving image
+M = moco(:,:,4,1);
+% M = double(imread('data/heart-110.png'));          % moving  image
+%M = double(imread('statue-rio-deformed.png'));  % moving  image
+M = imresize(M,0.5);
+M = 256*(M-min(M(:)))/range(M(:));              % normalize intensities
+
+
+if nlevel == 1
+    
+    %% Register
+    disp(['Register...']);
+    opt = struct('niter',niter, 'sigma_fluid',sigma_fluid, 'sigma_diffusion',sigma_diffusion, 'sigma_i',sigma_i, 'sigma_x',sigma_x, 'diffeomorphic',diffeomorphic, 'do_display',do_display, 'do_plotenergy',1);
+    [Mp,sx,sy,ux,uy] = register(F,M,opt);
+
+else
+    
+    %% Multiresolution
+    sx = zeros(size(M)); % deformation field
+    sy = zeros(size(M));
+    for k=nlevel:-1:1
+        disp(['Register level: ' num2str(k) '...']);
+
+        % downsample
+        scale = 2^-(k-1);
+        Fl = imresize(F,scale);
+        Ml = imresize(M,scale);
+        sxl = imresize(sx*scale,scale);
+        syl = imresize(sy*scale,scale);
+
+        % register
+        opt = struct('niter',niter,...
+            'sigma_fluid',sigma_fluid,...
+            'sigma_diffusion',sigma_diffusion,...
+            'sigma_i',sigma_i,...
+            'sigma_x',sigma_x,...
+            'diffeomorphic',diffeomorphic,...
+            'sx',sxl, 'sy',syl,...
+            'do_display',do_display, 'do_plotenergy',1);
+        [Mp,sxl,syl,uxl,uyl,eng] = register(Fl,Ml,opt);
+         
+        % upsample
+        sx = imresize(sxl/scale,size(M));
+        sy = imresize(syl/scale,size(M));
+    end
+    
+end
+
+end
+
+%% Register two images
+function [Mp,sx,sy,ux,uy,e] = register(F,M,opt)
+
+    %% Piggyback image
+    [F,lim] = piggyback(F,1.2);
+    [M,lim] = piggyback(M,1.2);
+    
+    %% T is the deformation from M to F
+    sx = zeros(size(M)); % deformation field
+    sy = zeros(size(M));
+    if isfield(opt,'sx') && isfield(opt,'sy')
+        sx = piggyback(opt.sx,1.2);
+        sy = piggyback(opt.sy,1.2);
+    end
+    e_min = 1e+100;      % Minimal energy
+    
+    %% Iterate update fields
+    for iter=1:opt.niter
+
+        % Find update
+        [ux,uy] = findupdate(F,M,sx,sy,opt.sigma_i,opt.sigma_x);
+
+        % Regularize update
+        ux    = imgaussian(ux,opt.sigma_fluid);
+        uy    = imgaussian(uy,opt.sigma_fluid);
+
+        % Get diffeomorphic update
+        if opt.diffeomorphic
+            [ux,uy] = expfield(ux,uy);
+        end
+
+        % Compute step (max half a pixel)
+        step  = 1;
+        
+        % Update correspondence (demons) - additive
+        %cx = sx + step*ux;
+        %cy = sy + step*uy;
+
+        % Update correspondence (demons) - composition
+        [cx,cy] = compose(sx,sy,step*ux,step*uy);
+        
+        % Regularize deformation
+        sx = imgaussian(cx,opt.sigma_diffusion);
+        sy = imgaussian(cy,opt.sigma_diffusion);
+
+        % Compute energy
+        e      = energy(F,M,sx,sy,cx,cy,opt.sigma_i,opt.sigma_x);
+        disp(['Iteration: ' num2str(iter) ' - ' 'energy: ' num2str(e)]);
+        if e<e_min
+            ux_min = ux; uy_min = uy; % update best fields
+            sx_min = sx; sy_min = sy;
+            e_min  = e;
+        else
+            break;
+        end
+
+        if opt.do_display
+            figure(1);
+            
+            % display deformation
+            subplot(2,4,7); showvector(ux,uy,4,3,lim); title('Update');
+            subplot(2,4,8); showvector(sx,sy,4,3,lim); title('Transformation');
+            drawnow;
+            
+            % Display registration
+            Mp     = iminterpolate(M,sx,sy);
+            diff   = (F-Mp).^2;
+            showimage(F,'Fixed', M,'Moving', Mp,'Warped', diff,'Diff', 'lim',lim,'nbrows',2); drawnow;
+
+            % Plot energy
+            if opt.do_plotenergy
+                plot_e(iter) = e;
+                subplot(2,2,3)
+                hold on;
+                plot(1:iter,plot_e,'r-'); xlim([0 opt.niter]);
+                xlabel('Iteration'); ylabel('Energy');
+                hold off;
+                drawnow
+            end
+        end
+
+    end
+    
+    %% Transform moving image
+    Mp = iminterpolate(M,sx_min,sy_min);
+    
+    %% Unpiggyback
+    Mp = Mp(lim(1):lim(2),lim(3):lim(4));
+    ux = ux(lim(1):lim(2),lim(3):lim(4));
+    uy = uy(lim(1):lim(2),lim(3):lim(4));
+    sx = sx(lim(1):lim(2),lim(3):lim(4));
+    sy = sy(lim(1):lim(2),lim(3):lim(4));
+
+end
+
+%% Find update between two images
+function [ux,uy] = findupdate(F,M,sx,sy,sigma_i,sigma_x)
+
+    % Interpolate updated image
+    M_prime = iminterpolate(M,sx,sy); % intensities at updated points
+    
+    % image difference
+    diff = F - M_prime;
+    
+    % moving image gradient
+    [gy,gx] = gradient(M_prime);   % image gradient
+    normg2  = gx.^2 + gy.^2;       % squared norm of gradient
+    area    = size(M,1)*size(M,2); % area of moving image
+    
+    % update is Idiff / (||J||^2+(Idiff^2)/sigma_x^2) J, with Idiff = F(x)-M(x+s), and J = Grad(M(x+s));
+    scale = diff ./ (normg2 + diff.^2*sigma_i^2/sigma_x^2);
+    scale(normg2==0) = 0;
+    scale(diff  ==0) = 0;
+    ux = gx .* scale;
+    uy = gy .* scale;
+    
+    % Zero non overlapping areas
+    ux(F==0)       = 0; uy(F==0)       = 0;
+    ux(M_prime==0) = 0; uy(M_prime==0) = 0;
+
+end
+
+%% Interpolate image
+function I = iminterpolate(I,sx,sy)
+
+    % Find update points on moving image
+    [x,y] = ndgrid(0:(size(I,1)-1), 0:(size(I,2)-1)); % coordinate image
+    x_prime = x + sx; % updated x values (1st dim, rows)
+    y_prime = y + sy; % updated y values (2nd dim, cols)
+    
+    % Interpolate updated image
+    I = interpn(x,y,I,x_prime,y_prime,'linear',0); % moving image intensities at updated points
+    
+end
+
+%% Apply gaussian filter to image
+function I = imgaussian(I,sigma)
+
+    if sigma==0; return; end; % no smoothing
+    
+    % Create Gaussian kernel
+    radius = ceil(3*sigma);
+    [x,y]  = ndgrid(-radius:radius,-radius:radius); % kernel coordinates
+    h      = exp(-(x.^2 + y.^2)/(2*sigma^2));
+    h      = h / sum(h(:));
+    
+    % Filter image
+    I = imfilter(I,h);
+
+end
+
+%% Exponentiate vector field
+
+function [vx,vy] = expfield(vx, vy)
+
+    % Find n, scaling parameter
+    normv2 = vx.^2 + vy.^2;
+    m = sqrt(max(normv2(:)));
+    n = ceil(log2(m/0.5)); % n big enough so max(v * 2^-n) < 0.5 pixel)
+    n = max(n,0);          % avoid null values
+    
+    % Scale it (so it's close to 0)
+    vx = vx * 2^-n;
+    vy = vy * 2^-n;
+
+    % square it n times
+    for i=1:n
+        [vx,vy] = compose(vx,vy, vx,vy);
+    end
+
+end
+
+%% Compose two vector fields
+function [vx,vy] = compose(ax,ay,bx,by)
+
+    [x,y] = ndgrid(0:(size(ax,1)-1), 0:(size(ax,2)-1)); % coordinate image
+    x_prime = x + ax; % updated x values
+    y_prime = y + ay; % updated y values
+    
+    % Interpolate vector field b at position brought by vector field a
+    bxp = interpn(x,y,bx,x_prime,y_prime,'linear',0); % interpolated bx values at x+a(x)
+    byp = interpn(x,y,by,x_prime,y_prime,'linear',0); % interpolated bx values at x+a(x)
+
+    % Compose
+    vx = ax + bxp;
+    vy = ay + byp;
+    
+end
+
+%% Get energy
+function e = energy(F,M,sx,sy,cx,cy,sigma_i,sigma_x)
+
+    % Intensity difference
+    Mp     = iminterpolate(M,sx,sy);
+    diff2  = (F-Mp).^2;
+    area   = size(M,1)*size(M,2);
+    
+    % Transformation Gradient
+    [gx_sx,gy_sx] = gradient(sx);
+    [gx_sy,gy_sy] = gradient(sy);
+    
+    % Three energy components
+    e_sim  = sum(diff2(:)) / area;
+    %e_dist = sum((cx(:)-sx(:)).^2 + (cy(:)-sy(:)).^2) / area;
+    e_reg  = sum(gx_sx(:).^2 + gy_sy(:).^2) / area;
+    
+    % Total energy
+    e      = e_sim + (sigma_i^2/sigma_x^2) * e_reg;
+
+end
+
+%% Random deformation
+function [I,sx,sy] = randomdeform(I,maxdeform,sigma)
+
+    if nargin<2; maxdeform = 3; end; % max 3 pixels of deformation
+    if nargin<3; sigma     = 3; end; % max smooth on 3 pixels
+    
+    % Create random deformation
+    s  = RandStream.create('mt19937ar','seed',1); RandStream.setDefaultStream(s); % always same random numbers
+    sx = maxdeform * 2*(rand(size(I))-0.5);
+    sy = maxdeform * 2*(rand(size(I))-0.5);
+    
+    % Smooth deformation
+    sx = imgaussian(sx,sigma);
+    sy = imgaussian(sy,sigma);
+    
+    % Interpolate updated image
+    I = iminterpolate(I,sx,sy);
+
+end
+
+%% Piggyback image
+function [I,lim] = piggyback(I,scale)
+
+    if nargin<2; scale = 2; end; % default, piggybacked image twice as big
+    
+    Ip  = zeros(ceil(size(I)*scale));
+    lim = bsxfun(@plus, floor(size(I)*(scale-1)/2), [[1 1];size(I)]); % image limits
+    Ip(lim(1):lim(2),lim(3):lim(4)) = I;                              % piggybacked image
+    I = Ip;
+
+end
+
+%% Display vector field
+%  Changed: Dec 6th, 2011
+%
+function showvector(ux,uy,downsample,scale,lim)
+
+    if nargin<3; downsample = 1; end;
+    
+    sizex = size(ux,1);
+    sizey = size(uy,2);
+    
+    ux  = ux(1:downsample:end, 1:downsample:end);
+    uy  = uy(1:downsample:end, 1:downsample:end);
+    
+    if nargin<4; scale = 3;                     end; % Scale vector to show small ones
+    if nargin<5; lim   = [0 sizex-1 0 sizey-1]; end; % Display whole image
+
+    [x,y] = ndgrid((0:downsample:(sizex-1))+downsample/2, (0:downsample:(sizey-1))+downsample/2); % coordinate image
+    quiver(y,x,uy,ux,scale);                  % show vectors
+    daspect([1 1 1]);
+    axis([lim(3) lim(4) lim(1) lim(2)]);      % which vector to show
+    axis off;
+    set(gca,'YDir','reverse');
+    
+end
+
+%% Display two images
+%  Changed: Dec 6th, 2011
+%
+function showimage(varargin)
+
+    % Check parameters
+    nb_args   = size(varargin,2);
+    nb_images = nb_args;
+    nb_rows   = 1;
+    row       = 1;
+    crange    = [0 1]*256; % default image intensities
+    
+    for i=1:nb_args
+        if ischar(varargin{i})
+            if isequal(varargin{i},'lim')
+                lim       = varargin{i+1};
+                nb_images = nb_images-2;
+            elseif isequal(varargin{i},'nbrows')
+                nb_rows   = varargin{i+1};
+                nb_images = nb_images-2;
+            elseif isequal(varargin{i},'row')
+                row       = varargin{i+1};
+                if row>nb_rows; nb_rows = row; end;
+                nb_images = nb_images-2;
+            elseif isequal(varargin{i},'caxis')
+                crange    = varargin{i+1};
+                nb_images = nb_images-2;
+            else
+                nb_images = nb_images-1;
+            end
+        end
+    end
+    
+    % Display images
+    iter_image = 1;
+    for iter_arg=1:nb_args
+        if ~ischar(varargin{iter_arg})
+            I = varargin{iter_arg};
+            subplot(nb_rows,nb_images,(row-1)*nb_images + iter_image);
+            imagesc(I,crange);
+            daspect([1 1 1]);
+            if exist('lim'); axis([lim(3) lim(4) lim(1) lim(2)]); end
+            axis off;
+            if iter_arg+1<=nb_args && ischar(varargin{iter_arg+1})
+                title(varargin{iter_arg+1});
+            end
+            iter_image = iter_image+1;
+        end
+        if iter_image>nb_images
+            break;
+        end
+    end
+        
+end

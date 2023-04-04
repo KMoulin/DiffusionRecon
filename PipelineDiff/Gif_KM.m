@@ -27,10 +27,10 @@ function  Gif_KM(Dcm, enum, FileName)
                   for cpt_avg=1:1: enum.dataset(cpt_set).slc(cpt_slc).b(cpt_b).dir(cpt_dir).nb_avg
                         tmpDataDcm=squeeze(Dcm(:,:,cpt_slc,cpt_b,cpt_dir,cpt_avg,cpt_set));          
                         if j==1
-                            imwrite( double( imresize(tmpDataDcm,[4*size(tmpDataDcm,1) 4*size(tmpDataDcm,2)],'nearest') ),[enum.dcm_dir '/Gif/' FileName '_' num2str(cpt_set) '_' num2str(cpt_slc) '.gif'],'gif', 'Loopcount',inf,'DelayTime',0.1);   %%%% First image, delay time = 0.1s         
+                            imwrite( double( imresize(tmpDataDcm,[4*size(tmpDataDcm,1) 4*size(tmpDataDcm,2)],'nearest') ),[enum.recon_dir '/Gif/' FileName '_' num2str(cpt_set) '_' num2str(cpt_slc) '.gif'],'gif', 'Loopcount',inf,'DelayTime',0.1);   %%%% First image, delay time = 0.1s         
                             j=2;
                         else
-                            imwrite( double( imresize(tmpDataDcm,[4*size(tmpDataDcm,1) 4*size(tmpDataDcm,2)],'nearest') ),[enum.dcm_dir '/Gif/' FileName '_' num2str(cpt_set) '_' num2str(cpt_slc) '.gif'],'gif','WriteMode','append','DelayTime',0.1); %%%% Following images
+                            imwrite( double( imresize(tmpDataDcm,[4*size(tmpDataDcm,1) 4*size(tmpDataDcm,2)],'nearest') ),[enum.recon_dir '/Gif/' FileName '_' num2str(cpt_set) '_' num2str(cpt_slc) '.gif'],'gif','WriteMode','append','DelayTime',0.1); %%%% Following images
                   
                         end
                   end

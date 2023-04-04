@@ -18,12 +18,12 @@ function [HA TRA]= HA_KM( EigVect1, Mask, P_Epi, P_Endo)
 %
 % OUTPUTS:  HA - HA image matrix (units [- pi pi])
 %                 [y x slices]
+%           
 %
-% ???? 08.14.2017
-% ?????
-% Ennis Lab @ UCLA; http://mrrl.ucla.edu
-
-
+% Kevin Moulin 01.13.2020
+% Kevin.Moulin.26@gmail.com
+% Ennis Lab @ UCLA: http://mrrl.ucla.edu
+% Ennis Lab @ Stanford: https://med.stanford.edu/cmrgroup/software.html
 
 
 
@@ -32,8 +32,8 @@ function [HA TRA]= HA_KM( EigVect1, Mask, P_Epi, P_Endo)
 yres = size(EigVect1,1);   xres = size(EigVect1,2);
 [Xq,Yq] = meshgrid(1:xres,1:yres);
 
-P_Epi=P_Epi(1:end-2,:);
-P_Endo=P_Endo(1:end-2,:);
+P_Epi=P_Epi(1:end-2,:,:);
+P_Endo=P_Endo(1:end-2,:,:);
 
 npts = size(P_Epi,1);
 npts2 = size(P_Endo,1);

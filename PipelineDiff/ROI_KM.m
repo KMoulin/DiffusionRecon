@@ -79,8 +79,9 @@ function [epi, endo, LV_mask] = Spline_Segmentation(IM, nEpi_max, nEndo_max)
 clear 'hepi';
 clear 'hendo';
  
-figure; title(gca,['Pick up to ' int2str(nEpi_max) ' points around the border around the epicardium']);
-imagesc(IM,[min(min(IM)) max(max(IM))]); hold on; % here just view the image you want to base your borders on
+figure('units','normalized','position',[0.156770833333333,0.040740740740741,0.577604166666667,0.769444444444444]); 
+imagesc(IM); hold on; % here just view the image you want to base your borders on min(min(IM)) max(max(IM)) ,[0 nanmean(nanmean(IM))*5]
+title(gca,['Pick up to ' int2str(nEpi_max) ' points around the border around the epicardium']);
  colormap('jet')
 % caxis([0 4*nanmedian(nanmedian(IM))])
 epi_tmp = zeros(nEpi_max,2);
