@@ -115,8 +115,18 @@ function [Dcm enum]= AnalyseDataSet_KM(varargin)
                 enum.dcm_dir=FolderName;
                 enum.SerieUID=tmpInfoDcm.SeriesInstanceUID;
                 enum.PatientUID=tmpInfoDcm.StudyInstanceUID;
-                enum.ImOrien=tmpInfoDcm.ImageOrientationPatient;
-                enum.dTrans=tmpInfoDcm.ImagePositionPatient;
+                enum.ImOrien= infoDcm.ImOrien;
+                enum.dTrans= infoDcm.ImPos;
+                enum.NFrames=infoDcm.NFrames;
+
+                if enum.NFrames>1
+                    infoDcm(k).slc=1;
+                    for cpt_nf=2:1:enum.NFrames
+                        infoDcm(k+1)=infoDcm(k);
+                        infoDcm(k+1).slc=cpt_nf;
+                        k=k+1;
+                    end
+                end
                 k=k+1;
            %end
         end
@@ -131,14 +141,21 @@ function [Dcm enum]= AnalyseDataSet_KM(varargin)
   
     %%% Build Enum Size %%%  
     enum.b=sort(enum.b);
-    enum.slc=sort(enum.slc);
+    
+    if (enum.NFrames>1)
+        enum.slc=1:enum.NFrames;
+        enum.datasize(dataset_num).slc=enum.NFrames;
+    else
+        enum.slc=sort(enum.slc);
+        enum.datasize(dataset_num).slc=size(enum.slc,2);
+    end
     enum.datasize(dataset_num).b=size(enum.b,2);
-    enum.datasize(dataset_num).slc=size(enum.slc,2);
+   
     enum.datasize(dataset_num).dir=1;
     enum.datasize(dataset_num).avg=1;
     
     %%% Build Enum Data %%% 
-    for cpt_slc=1:1:enum.datasize.slc
+    for cpt_slc=1:1:enum.datasize(dataset_num).slc
         enum.dataset(dataset_num).slc(cpt_slc).b=[];
         for cpt_b=1:1: enum.datasize.b
              enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir=[];
@@ -238,24 +255,28 @@ function [Dcm enum]= AnalyseDataSet_KM(varargin)
      h = waitbar(0,'Create Volumes...'); 
      
      %%% Memory pre-alloc
-     Dcm=zeros(size(double(dicomread([infoDcm(1).foldername '/' infoDcm(1).filename])),1),size(double(dicomread([infoDcm(1).foldername  '/' infoDcm(1).filename])),2), enum.datasize(dataset_num).slc, enum.datasize(dataset_num).b, enum.datasize(dataset_num).dir, enum.datasize(dataset_num).avg);
+     Dcm=zeros(size(double(dicomread([infoDcm(1).foldername '/' infoDcm(1).filename])),1),size(double(dicomread([infoDcm(1).foldername  '/' infoDcm(1).filename])),2), max(enum.datasize(dataset_num).slc,enum.NFrames), enum.datasize(dataset_num).b, enum.datasize(dataset_num).dir, enum.datasize(dataset_num).avg);
 
-     for cpt_slc=1:1:enum.datasize(dataset_num).slc
+    for cpt_slc=1:1:enum.datasize(dataset_num).slc
        for cpt_b=1:1:enum.datasize(dataset_num).b     
           for cpt_dir=1:1: enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).nb_dir           
              for cpt_avg=1:1: enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).nb_avg
                  
                   tmp_dcm=double(dicomread([enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).foldername '/' enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).filename]));
-                  if size(tmp_dcm,1)==size(Dcm,1)
-                    Dcm(:,:,cpt_slc,cpt_b,cpt_dir,cpt_avg)=double(dicomread([enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).foldername '\' enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).filename]));
+                  if (enum.NFrames>1)
+                     tmp_dcm=squeeze(tmp_dcm(:,:,:,cpt_slc));
+                  end
+                  if size(tmp_dcm,1)==size(Dcm,1)                     
+                    Dcm(:,:,cpt_slc,cpt_b,cpt_dir,cpt_avg)=tmp_dcm;
                   else
-                    Dcm(:,:,cpt_slc,cpt_b,cpt_dir,cpt_avg)=double(dicomread([enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).foldername '\' enum.dataset(dataset_num).slc(cpt_slc).b(cpt_b).dir(cpt_dir).avg(cpt_avg).filename])'); 
+                    Dcm(:,:,cpt_slc,cpt_b,cpt_dir,cpt_avg)=tmp_dcm'; 
                   end
              end
            end
         end
         waitbar(cpt_slc/size(enum.slc,2),h);
-     end
+    end
+
      %%% Just for safety.
      close(h);
      
@@ -331,6 +352,7 @@ function InfoStruct=Extract_info_SIEMENS(tmpInfoDcm)
        elseif isfield(tmpInfoDcm, 'Private_0021_1105')    % update XA20 +
            bval=tmpInfoDcm.Private_0021_1105;
        elseif isfield(tmpInfoDcm,'Private_0021_1177') % update XA20 +
+          
            if ~isempty(strfind(tmpInfoDcm.Private_0021_1177,'ep_b'))
                if ~isempty(strfind(tmpInfoDcm.Private_0021_1177,'#'))
                  bval=str2num(tmpInfoDcm.SequenceName(strfind(tmpInfoDcm.Private_0021_1177,'b')+1:strfind(tmpInfoDcm.Private_0021_1177,'#')-1));
@@ -341,6 +363,8 @@ function InfoStruct=Extract_info_SIEMENS(tmpInfoDcm)
            else
                bval=0;
            end
+       elseif isfield(tmpInfoDcm,'PerFrameFunctionalGroupsSequence') % update XA20 +
+            bval=(tmpInfoDcm.PerFrameFunctionalGroupsSequence.Item_1.MRDiffusionSequence.Item_1.DiffusionBValue);
        else
            if ~isempty(strfind(tmpInfoDcm.SequenceName,'ep_b'))
                if ~isempty(strfind(tmpInfoDcm.SequenceName,'#'))
@@ -354,8 +378,9 @@ function InfoStruct=Extract_info_SIEMENS(tmpInfoDcm)
            end
        end
        
+
        
-       if   bval<10                
+       if   bval<25                
            InfoStruct.b = 0;   
            InfoStruct.dirV = [0 0 0];
        else  
@@ -372,6 +397,13 @@ function InfoStruct=Extract_info_SIEMENS(tmpInfoDcm)
                 Im_1=ImOrien(1:3); % attention: this is because matlab read first the colume and second the row
                 Im_2=ImOrien(4:6);     
                 InfoStruct.dirV = ([Im_1';Im_2';Im_3']* tmpInfoDcm.Private_0021_1146)';
+            elseif isfield(tmpInfoDcm,'PerFrameFunctionalGroupsSequence') % enhanced Siemens XA30+
+                dirV=(tmpInfoDcm.PerFrameFunctionalGroupsSequence.Item_1.MRDiffusionSequence.Item_1.DiffusionGradientDirectionSequence.Item_1.DiffusionGradientOrientation);
+                ImOrien=tmpInfoDcm.PerFrameFunctionalGroupsSequence.Item_1.PlaneOrientationSequence.Item_1.ImageOrientationPatient;
+                Im_3=cross(ImOrien(1:3),ImOrien(4:6));
+                Im_1=ImOrien(1:3); % attention: this is because matlab read first the colume and second the row
+                Im_2=ImOrien(4:6);     
+                InfoStruct.dirV = ([Im_1';Im_2';Im_3']* dirV)';
             else
                % disp('diffusion direction not found')    
                 InfoStruct.dirV = [dir 0 0];
@@ -383,27 +415,43 @@ function InfoStruct=Extract_info_SIEMENS(tmpInfoDcm)
         else 
             InfoStruct.slicePerMosa=1;
        end
-        
-        InfoStruct.slc = tmpInfoDcm.SliceLocation;     
-           
+            
         if (isfield(tmpInfoDcm, 'TriggerTime')) 
             InfoStruct.tt= tmpInfoDcm.TriggerTime;
         else
             InfoStruct.tt=0;
         end
-
-        InfoStruct.ImOrien = tmpInfoDcm.ImageOrientationPatient; 
-        InfoStruct.ImPos   =  tmpInfoDcm.ImagePositionPatient;
-        InfoStruct.slc = tmpInfoDcm.SliceLocation; 
-        
-        InfoStruct.EchoTime= tmpInfoDcm.EchoTime;
-        InfoStruct.RepetitionTime=tmpInfoDcm.RepetitionTime;
-        InfoStruct.PixelSpacing=tmpInfoDcm.PixelSpacing;
-        InfoStruct.SliceThickness=tmpInfoDcm.SliceThickness;
-        
-        tmpV=tmpInfoDcm.AcquisitionTime;
-        InfoStruct.AcqTime=(str2double(tmpV(1,1:2))*60*60+str2double(tmpV(1,3:4))*60+str2double(tmpV(1,5:6))) + str2double(tmpV(1,8))*10^-1 + str2double(tmpV(1,9))*10^-2 + str2double(tmpV(1,10))*10^-3 + str2double(tmpV(1,11))*10^-4;  %s
-     
+        if isfield (tmpInfoDcm,'NumberOfFrames')
+             InfoStruct.NFrames=tmpInfoDcm.NumberOfFrames;
+        else
+             InfoStruct.NFrames=1;
+        end
+        if isfield(tmpInfoDcm,'PerFrameFunctionalGroupsSequence') % enhanced Siemens XA30+
+            InfoStruct.ImOrien = tmpInfoDcm.PerFrameFunctionalGroupsSequence.Item_1.PlaneOrientationSequence.Item_1.ImageOrientationPatient; 
+            InfoStruct.ImPos   =  tmpInfoDcm.PerFrameFunctionalGroupsSequence.Item_1.PlanePositionSequence.Item_1.ImagePositionPatient;
+            InfoStruct.slc = tmpInfoDcm.PerFrameFunctionalGroupsSequence.Item_1.FrameContentSequence.Item_1.InStackPositionNumber; 
+            InfoStruct.EchoTime= tmpInfoDcm.PerFrameFunctionalGroupsSequence.Item_1.MREchoSequence.Item_1.EffectiveEchoTime;
+            InfoStruct.RepetitionTime=tmpInfoDcm.SharedFunctionalGroupsSequence.Item_1.MRTimingAndRelatedParametersSequence.Item_1.RepetitionTime;
+            InfoStruct.PixelSpacing=tmpInfoDcm.PerFrameFunctionalGroupsSequence.Item_1.PixelMeasuresSequence.Item_1.PixelSpacing;
+            InfoStruct.SliceThickness=tmpInfoDcm.PerFrameFunctionalGroupsSequence.Item_1.PixelMeasuresSequence.Item_1.SliceThickness;
+            InfoStruct.SliceGap=tmpInfoDcm.PerFrameFunctionalGroupsSequence.Item_1.PixelMeasuresSequence.Item_1.SpacingBetweenSlices;   
+            tmpV=tmpInfoDcm.AcquisitionDateTime;
+            InfoStruct.AcqTime=(str2double(tmpV(1,1:2))*60*60+str2double(tmpV(1,3:4))*60+str2double(tmpV(1,5:6))) + str2double(tmpV(1,8))*10^-1 + str2double(tmpV(1,9))*10^-2 + str2double(tmpV(1,10))*10^-3 + str2double(tmpV(1,11))*10^-4;  %s
+            %InfoStruct.NFrames=tmpInfoDcm.NumberOfFrames;
+        else
+            InfoStruct.ImOrien = tmpInfoDcm.ImageOrientationPatient; 
+            InfoStruct.ImPos   =  tmpInfoDcm.ImagePositionPatient;
+            InfoStruct.slc = tmpInfoDcm.SliceLocation; 
+            InfoStruct.EchoTime= tmpInfoDcm.EchoTime;
+            InfoStruct.RepetitionTime=tmpInfoDcm.RepetitionTime;
+            InfoStruct.PixelSpacing=tmpInfoDcm.PixelSpacing;
+            InfoStruct.SliceThickness=tmpInfoDcm.SliceThickness;
+            tmpV=tmpInfoDcm.ContentTime;
+            InfoStruct.AcqTime=(str2double(tmpV(1,1:2))*60*60+str2double(tmpV(1,3:4))*60+str2double(tmpV(1,5:6))) + str2double(tmpV(1,8))*10^-1 + str2double(tmpV(1,9))*10^-2 + str2double(tmpV(1,10))*10^-3 + str2double(tmpV(1,11))*10^-4;  %s
+            InfoStruct.SliceGap=0;
+            %InfoStruct.NFrames=1;
+        end
+             
     end
 
 function InfoStruct=Extract_info_PHILIPS(tmpInfoDcm)
@@ -455,6 +503,8 @@ function InfoStruct=Extract_info_PHILIPS(tmpInfoDcm)
         tmpV=tmpInfoDcm.AcquisitionTime;
         InfoStruct.AcqTime=(str2double(tmpV(1,1:2))*60*60+str2double(tmpV(1,3:4))*60+str2double(tmpV(1,5:6))) + str2double(tmpV(1,8))*10^-1 + str2double(tmpV(1,9))*10^-2 ;  %s
      
+        InfoStruct.SliceGap=0;
+        InfoStruct.NFrames=1;
     end
 
 function  Write_grad_file_KM(directions,num)
